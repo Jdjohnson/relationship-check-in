@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "metadata": {
+    "userPrivacyType": "doesNotTrack",
+    "purpose": "This app uses only Apple frameworks and iCloud CloudKit for user-supplied content. No third-party SDKs or tracking."
+  },
+  "privacy": {
+    "tracking": {
+      "usesTracking": false
+    },
+    "dataCategories": []
+  }
+}
+
+

@@ -1,0 +1,104 @@
+//
+//  PairingViewModel.swift
+//  RelationshipCheckin
+//
+//  Created on 10/10/2025.
+//
+
+import Foundation
+import CloudKit
+import SwiftUI
+
+@MainActor
+class PairingViewModel: ObservableObject {
+    @Published var isCreatingLink = false
+    @Published var isAcceptingLink = false
+    @Published var shareURL: URL?
+    @Published var error: String?
+    @Published var showShareSheet = false
+    
+    private let cloudKitService = CloudKitService.shared
+    private let shareService = ShareService.shared
+    
+    private var coupleRecord: CKRecord?
+    private var share: CKShare?
+    
+    // MARK: - Create Invite Link
+    
+    func createInviteLink() async {
+        isCreatingLink = true
+        error = nil
+        
+        do {
+            // Fetch or create couple record
+            let couple = try await cloudKitService.ensureCouple()
+            self.coupleRecord = couple
+            
+            // Create share
+            let share = try await shareService.createShare(for: couple)
+            self.share = share
+            
+            // Get share URL and wrap in in-app deep link for acceptance
+            if let url = shareService.getShareURL(for: share),
+               let deepLink = makeAcceptDeepLink(from: url) {
+                self.shareURL = deepLink
+                self.showShareSheet = true
+            }
+            
+            isCreatingLink = false
+        } catch {
+            self.error = "Failed to create invite link: \(error.localizedDescription)"
+            isCreatingLink = false
+        }
+    }
+    
+    // MARK: - Deep Link Builder
+    
+    private func makeAcceptDeepLink(from shareURL: URL) -> URL? {
+        var components = URLComponents()
+        components.scheme = "rc"
+        components.host = "accept"
+        components.queryItems = [URLQueryItem(name: "share", value: shareURL.absoluteString)]
+        return components.url
+    }
+    
+    // MARK: - Accept Invite Link
+    
+    func acceptInviteLink(url: URL) async {
+        isAcceptingLink = true
+        error = nil
+        
+        do {
+            // Support both raw CKShare URLs and rc://accept deep links
+            let targetURL: URL
+            if url.scheme == "rc",
+               let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let shareStr = comps.queryItems?.first(where: { $0.name == "share" })?.value,
+               let shareURL = URL(string: shareStr) {
+                targetURL = shareURL
+            } else {
+                targetURL = url
+            }
+            let metadata = try await shareService.fetchShareMetadata(from: targetURL)
+            try await shareService.acceptShare(metadata: metadata)
+            
+            isAcceptingLink = false
+        } catch {
+            self.error = "Failed to accept invite: \(error.localizedDescription)"
+            isAcceptingLink = false
+        }
+    }
+    
+    // MARK: - Complete Pairing
+    
+    func completePairing() async {
+        // After partner accepts, stop sharing to lock at two users
+        if let share = share {
+            do {
+                try await shareService.stopSharing(share: share)
+            } catch {
+                print("Error stopping share: \(error)")
+            }
+        }
+    }
+}

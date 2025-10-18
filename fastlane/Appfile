@@ -1,0 +1,6 @@
+app_identifier("com.jaradjohnson.RelationshipCheckin")
+apple_id(ENV['APPLE_ID'])
+itc_team_id(ENV['APP_STORE_CONNECT_TEAM_ID'])
+team_id(ENV['DEVELOPMENT_TEAM_ID'])
+
+
