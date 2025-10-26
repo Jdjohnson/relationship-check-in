@@ -47,7 +47,7 @@
 		BB0015 /* HistoryDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDrawerView.swift; sourceTree = "<group>"; };
 		BB0016 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		BB0017 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
-		BB0018 /* AppDelegate+CloudKitShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Infrastructure/AppDelegate+CloudKitShare.swift"; sourceTree = "<group>"; };
+		BB0018 /* AppDelegate+CloudKitShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+CloudKitShare.swift"; sourceTree = "<group>"; };
 		CC0001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DD0001 /* RelationshipCheckin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RelationshipCheckin.entitlements; sourceTree = "<group>"; };
 		EE0001 /* RelationshipCheckin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RelationshipCheckin.app; sourceTree = BUILT_PRODUCTS_DIR; };
