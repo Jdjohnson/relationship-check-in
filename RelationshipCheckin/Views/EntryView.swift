@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct EntryView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var viewModel: EntryViewModel
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focusedField: Field?
@@ -22,7 +23,7 @@ struct EntryView: View {
     
     var body: some View {
         ZStack {
-            DesignSystem.Colors.background
+            DesignSystem.Colors.background(for: colorScheme)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -57,7 +58,7 @@ struct EntryView: View {
                 Button("Close") {
                     dismiss()
                 }
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             }
         }
     }
@@ -68,21 +69,25 @@ struct EntryView: View {
         VStack(spacing: DesignSystem.Spacing.sm) {
             ZStack {
                 Circle()
-                    .fill(viewModel.entryType == .morning ? DesignSystem.Colors.warmGold : DesignSystem.Colors.primaryPurple)
+                    .fill(
+                        viewModel.entryType == .morning ? 
+                            (colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold) :
+                            (colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
+                    )
                     .frame(width: 64, height: 64)
                 
                 Image(systemName: viewModel.entryType == .morning ? "sunrise.fill" : "moon.stars.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(DesignSystem.Colors.pureWhite)
+                    .foregroundStyle(.white)
             }
             
             Text(viewModel.entryType == .morning ? "Morning Check-in" : "Evening Check-in")
                 .font(DesignSystem.Typography.title2)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
             
             Text(Date(), style: .date)
                 .font(DesignSystem.Typography.caption)
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
         }
         .frame(maxWidth: .infinity)
     }
@@ -152,7 +157,7 @@ struct EntryView: View {
             HStack(spacing: DesignSystem.Spacing.sm) {
                 if viewModel.isSaving {
                     ProgressView()
-                        .tint(DesignSystem.Colors.pureWhite)
+                        .tint(.white)
                 }
                 Text(viewModel.showSuccess ? "Saved!" : "Save Check-in")
             }
@@ -171,17 +176,17 @@ struct EntryView: View {
             VStack(spacing: DesignSystem.Spacing.lg) {
                 ZStack {
                     Circle()
-                        .fill(DesignSystem.Colors.primaryPurple)
+                        .fill(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                         .frame(width: 80, height: 80)
                     
                     Image(systemName: "checkmark")
                         .font(.system(size: 40, weight: .bold))
-                        .foregroundStyle(DesignSystem.Colors.pureWhite)
+                        .foregroundStyle(.white)
                 }
                 
                 Text("Saved!")
                     .font(DesignSystem.Typography.title1)
-                    .foregroundStyle(DesignSystem.Colors.pureWhite)
+                    .foregroundStyle(.white)
             }
             .padding(DesignSystem.Spacing.xxl)
             .background {

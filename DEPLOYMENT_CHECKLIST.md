@@ -31,12 +31,13 @@
 - [ ] Login to [CloudKit Dashboard](https://icloud.developer.apple.com/dashboard)
 - [ ] Select container: `iCloud.com.jaradjohnson.RelationshipCheckin`
 - [ ] Navigate to Schema → Development
+- [ ] Reference `CloudKit/schema.ckdsl` when verifying record types/fields
 
 #### Create Couple Record Type
 - [ ] Click "+" to add Record Type
 - [ ] Name: `Couple`
-- [ ] Add field: `ownerUserRecordID` (Reference → User)
-- [ ] Add field: `partnerUserRecordID` (Reference → User)
+- [ ] Add field: `ownerUserRecordID` (Reference → User if adding manually)
+- [ ] Add field: `partnerUserRecordID` (Reference → User if adding manually)
 - [ ] Save
 
 #### Create DailyEntry Record Type
@@ -44,9 +45,9 @@
 - [ ] Name: `DailyEntry`
 - [ ] Add field: `date` (Date/Time)
 - [ ] Add index on `date` (Queryable)
-- [ ] Add field: `authorUserRecordID` (Reference → User)
-- [ ] Add index on `authorUserRecordID` (Queryable)
-- [ ] Add field: `couple` (Reference → Couple)
+- [ ] Add field: `authorUserRecordID` (Reference → User if desired)
+- [ ] (Optional) Add index on `authorUserRecordID` (Queryable if you plan to filter by author)
+- [ ] Add field: `couple` (Reference → Couple if desired)
 - [ ] Add field: `morningNeed` (String)
 - [ ] Add field: `eveningMood` (Int64)
 - [ ] Add field: `gratitude` (String)
@@ -328,4 +329,3 @@ If you want to make it available on App Store (optional):
 **Next Step**: Start with "Pre-Deployment Setup" section
 
 Good luck! 🚀
-

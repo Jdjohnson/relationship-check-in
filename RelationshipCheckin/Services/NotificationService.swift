@@ -8,6 +8,7 @@
 import Foundation
 import UserNotifications
 import SwiftUI
+import UIKit
 
 @MainActor
 class NotificationService: ObservableObject {
@@ -43,6 +44,9 @@ class NotificationService: ObservableObject {
         morningContent.body = "One thing I need today..."
         morningContent.sound = .default
         morningContent.userInfo = ["deeplink": "rc://entry/morning"]
+        if let attachment = makeAppIconAttachment() {
+            morningContent.attachments = [attachment]
+        }
         
         var morningComponents = DateComponents()
         morningComponents.hour = 8
@@ -57,6 +61,9 @@ class NotificationService: ObservableObject {
         eveningContent.body = "How was your day?"
         eveningContent.sound = .default
         eveningContent.userInfo = ["deeplink": "rc://entry/evening"]
+        if let attachment = makeAppIconAttachment() {
+            eveningContent.attachments = [attachment]
+        }
         
         var eveningComponents = DateComponents()
         eveningComponents.hour = 17
@@ -83,6 +90,25 @@ class NotificationService: ObservableObject {
     
     func cancelNotifications() {
         center.removeAllPendingNotificationRequests()
+    }
+
+    // MARK: - Helpers
+
+    private func makeAppIconAttachment() -> UNNotificationAttachment? {
+        // Load from asset catalog
+        guard let image = UIImage(named: "NotificationIcon") else { return nil }
+        guard let pngData = image.pngData() else { return nil }
+        do {
+            let cachesDir = try FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            // Use a stable filename so we reuse the same file
+            let fileURL = cachesDir.appendingPathComponent("notification-icon.png")
+            try pngData.write(to: fileURL, options: .atomic)
+            let attachment = try UNNotificationAttachment(identifier: "app-icon", url: fileURL, options: nil)
+            return attachment
+        } catch {
+            print("Failed to create notification attachment: \(error)")
+            return nil
+        }
     }
 }
 

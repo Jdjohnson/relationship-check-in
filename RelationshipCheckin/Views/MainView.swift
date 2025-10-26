@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MainView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var viewModel = MainViewModel()
     @State private var showHistory = false
     @State private var showMorningEntry = false
@@ -16,7 +17,7 @@ struct MainView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DesignSystem.Colors.background
+                DesignSystem.Colors.background(for: colorScheme)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -76,11 +77,11 @@ struct MainView: View {
         VStack(spacing: DesignSystem.Spacing.xs) {
             Text("Today")
                 .font(DesignSystem.Typography.largeTitle)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
             
             Text(Date(), style: .date)
                 .font(DesignSystem.Typography.subheadline)
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
         }
         .frame(maxWidth: .infinity)
     }
@@ -109,11 +110,11 @@ struct MainView: View {
                 HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(DesignSystem.Colors.accent)
+                        .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.accentBright : DesignSystem.Colors.accent)
                     
                     Text("From Your Partner")
                         .font(DesignSystem.Typography.headline)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                     
                     Spacer()
                 }
@@ -121,31 +122,31 @@ struct MainView: View {
                 // Content grid
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
                     if let morningNeed = entry.morningNeed {
-                        compactField(icon: "sunrise.fill", text: morningNeed, color: DesignSystem.Colors.warmGold)
+                        compactField(icon: "sunrise.fill", text: morningNeed, color: colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold)
                     }
                     
                     if let mood = entry.eveningMood {
                         HStack(spacing: DesignSystem.Spacing.sm) {
                             Image(systemName: "moon.stars.fill")
                                 .font(.system(size: 14))
-                                .foregroundStyle(DesignSystem.Colors.primaryPurple)
+                                .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                             
                             Circle()
-                                .fill(mood.color)
+                                .fill(mood.adaptiveColor(for: colorScheme))
                                 .frame(width: 16, height: 16)
                             
                             Text(mood.displayName)
                                 .font(DesignSystem.Typography.subheadline)
-                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                         }
                     }
                     
                     if let gratitude = entry.gratitude {
-                        compactField(icon: "sparkles", text: gratitude, color: DesignSystem.Colors.accent)
+                        compactField(icon: "sparkles", text: gratitude, color: colorScheme == .dark ? DesignSystem.Colors.accentBright : DesignSystem.Colors.accent)
                     }
                     
                     if let tomorrowGreat = entry.tomorrowGreat {
-                        compactField(icon: "arrow.forward.circle", text: tomorrowGreat, color: DesignSystem.Colors.primaryPurple)
+                        compactField(icon: "arrow.forward.circle", text: tomorrowGreat, color: colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                     }
                 }
             }
@@ -161,7 +162,7 @@ struct MainView: View {
             
             Text(text)
                 .font(DesignSystem.Typography.subheadline)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                 .lineLimit(2)
         }
     }
@@ -187,18 +188,18 @@ struct MainView: View {
                 VStack(spacing: DesignSystem.Spacing.sm) {
                     ZStack {
                         Circle()
-                            .fill(DesignSystem.Colors.warmGold)
+                            .fill(colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold)
                             .frame(width: 48, height: 48)
                         
                         Image(systemName: "sunrise.fill")
                             .font(.system(size: 22))
-                            .foregroundStyle(DesignSystem.Colors.pureWhite)
+                            .foregroundStyle(.white)
                     }
                     
                     Text("Morning")
                         .font(DesignSystem.Typography.footnote)
                         .fontWeight(.semibold)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignSystem.Spacing.md)
@@ -207,7 +208,10 @@ struct MainView: View {
                         .fill(.ultraThinMaterial)
                         .overlay {
                             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.md, style: .continuous)
-                                .strokeBorder(DesignSystem.Colors.warmGold.opacity(0.3), lineWidth: 1)
+                                .strokeBorder(
+                                    (colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold).opacity(0.3),
+                                    lineWidth: 1
+                                )
                         }
                 }
             }
@@ -220,18 +224,18 @@ struct MainView: View {
                 VStack(spacing: DesignSystem.Spacing.sm) {
                     ZStack {
                         Circle()
-                            .fill(DesignSystem.Colors.primaryPurple)
+                            .fill(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                             .frame(width: 48, height: 48)
                         
                         Image(systemName: "moon.stars.fill")
                             .font(.system(size: 22))
-                            .foregroundStyle(DesignSystem.Colors.pureWhite)
+                            .foregroundStyle(.white)
                     }
                     
                     Text("Evening")
                         .font(DesignSystem.Typography.footnote)
                         .fontWeight(.semibold)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DesignSystem.Spacing.md)
@@ -240,7 +244,10 @@ struct MainView: View {
                         .fill(.ultraThinMaterial)
                         .overlay {
                             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.md, style: .continuous)
-                                .strokeBorder(DesignSystem.Colors.primaryPurple.opacity(0.3), lineWidth: 1)
+                                .strokeBorder(
+                                    (colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple).opacity(0.3),
+                                    lineWidth: 1
+                                )
                         }
                 }
             }
@@ -258,14 +265,14 @@ struct MainView: View {
             
             Text("You've checked in")
                 .font(DesignSystem.Typography.subheadline)
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             
             Spacer()
         }
         .padding(DesignSystem.Spacing.md)
         .background {
             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.sm, style: .continuous)
-                .fill(DesignSystem.Colors.lightLavender.opacity(0.5))
+                .fill(DesignSystem.Colors.secondaryBackground(for: colorScheme).opacity(0.5))
         }
     }
 }

@@ -1,5 +1,7 @@
 # CloudKit Schema Configuration
 
+> Primary schema definition lives in `CloudKit/schema.ckdsl`. Use it when importing or verifying the dashboard so documentation and code stay in sync. CloudKit's DSL cannot limit reference targets, so set those manually in the Dashboard if you need stricter types.
+
 ## Container Information
 
 - **Container ID**: `iCloud.com.jaradjohnson.RelationshipCheckin`
@@ -14,8 +16,8 @@ This record represents the relationship between two users.
 
 | Field Name | Type | Required | Notes |
 |------------|------|----------|-------|
-| `ownerUserRecordID` | Reference (User) | Yes | The user who created the couple record |
-| `partnerUserRecordID` | Reference (User) | No | Set after partner accepts invite |
+| `ownerUserRecordID` | Reference | Yes | Points to the creating user (set reference type to **User** in Dashboard if doing it manually) |
+| `partnerUserRecordID` | Reference | No | Populated after partner accepts invite |
 
 **Indexes**: None required (queries use predicates)
 
@@ -30,8 +32,8 @@ This record stores daily check-in data for each user.
 | Field Name | Type | Required | Notes |
 |------------|------|----------|-------|
 | `date` | Date/Time | Yes | Start of day (midnight) |
-| `authorUserRecordID` | Reference (User) | Yes | User who created this entry |
-| `couple` | Reference (Couple) | Yes | Links to the couple record |
+| `authorUserRecordID` | Reference | Yes | User who created this entry (optionally mark as **User** in Dashboard) |
+| `couple` | Reference | Yes | Links to the couple record (optionally constrain to **Couple** in Dashboard) |
 | `morningNeed` | String | No | Morning check-in: what I need |
 | `eveningMood` | Int(64) | No | Evening mood: 0=green, 1=yellow, 2=red |
 | `gratitude` | String | No | Evening: gratitude for partner |
@@ -41,9 +43,9 @@ This record stores daily check-in data for each user.
 - Example: `DailyEntry_2025-10-10_ABC123DEF456`
 - This ensures one entry per user per day (idempotent upsert)
 
-**Indexes**: 
-- `date` (queryable) - for fetching entries by date range
-- `authorUserRecordID` (queryable) - for fetching user's entries
+**Indexes**:
+- `date` (queryable) - required for fetching entries by date range
+- *(Optional)* `authorUserRecordID` (queryable) - add if you plan to query entries by author
 
 **Security**:
 - Author can read/write their own entries
@@ -83,18 +85,16 @@ The app automatically creates this zone on first launch if it doesn't exist.
 
 1. **Login**: Go to [CloudKit Dashboard](https://icloud.developer.apple.com/dashboard)
 2. **Select Container**: `iCloud.com.jaradjohnson.RelationshipCheckin`
-3. **Go to Schema → Development**
+3. **Go to Schema → Development** (you can import `CloudKit/schema.ckdsl` or follow the manual steps below)
 
 #### Create Couple Record Type
 ```
 1. Click "+" next to Record Types
 2. Name: Couple
 3. Add Field: ownerUserRecordID
-   - Type: Reference
-   - Reference Type: User
+   - Type: Reference (set Reference Type to *User* if desired)
 4. Add Field: partnerUserRecordID
-   - Type: Reference
-   - Reference Type: User
+   - Type: Reference (set Reference Type to *User* if desired)
 5. Save
 ```
 
@@ -106,12 +106,10 @@ The app automatically creates this zone on first launch if it doesn't exist.
    - Type: Date/Time
    - Add Index (Queryable)
 4. Add Field: authorUserRecordID
-   - Type: Reference
-   - Reference Type: User
-   - Add Index (Queryable)
+   - Type: Reference (optionally set Reference Type to *User*)
+   - *(Optional)* Add Index (Queryable) if you'll run author-based queries
 5. Add Field: couple
-   - Type: Reference
-   - Reference Type: Couple
+   - Type: Reference (optionally set Reference Type to *Couple*)
 6. Add Field: morningNeed
    - Type: String
 7. Add Field: eveningMood
@@ -257,4 +255,3 @@ For this app with 2 users and text-only data:
 - **Storage**: ~1KB per entry × 365 days × 2 users = ~730KB/year
 - **Transfer**: Minimal (text only)
 - **Cost**: $0 (well within free tier)
-

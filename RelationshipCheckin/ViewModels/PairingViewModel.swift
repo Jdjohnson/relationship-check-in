@@ -38,16 +38,23 @@ class PairingViewModel: ObservableObject {
             let share = try await shareService.createShare(for: couple)
             self.share = share
             
-            // Get share URL and wrap in in-app deep link for acceptance
-            if let url = shareService.getShareURL(for: share),
-               let deepLink = makeAcceptDeepLink(from: url) {
-                self.shareURL = deepLink
+            // Get iCloud share URL for system share sheet
+            if let url = shareService.getShareURL(for: share) {
+                self.shareURL = url
                 self.showShareSheet = true
             }
             
             isCreatingLink = false
         } catch {
-            self.error = "Failed to create invite link: \(error.localizedDescription)"
+            if let nsError = error as NSError?,
+               nsError.domain == "ShareService",
+               nsError.code == -2 {
+                self.error = "Only the owner can create invites. Ask your partner to use Accept Invite."
+            } else if let ck = error as? CKError {
+                self.error = "CloudKit: \(ck.code) – \(ck.localizedDescription)"
+            } else {
+                self.error = "Failed to create invite link: \(error.localizedDescription)"
+            }
             isCreatingLink = false
         }
     }

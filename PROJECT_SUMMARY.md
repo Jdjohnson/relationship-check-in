@@ -224,14 +224,16 @@ Relationship Check-in/
 
 ## CloudKit Schema
 
+Source of truth: `CloudKit/schema.ckdsl` (mirror these settings in CloudKit Dashboard).
+
 ### Couple Record
-- `ownerUserRecordID` (Reference → User)
-- `partnerUserRecordID` (Reference → User)
+- `ownerUserRecordID` (Reference — set to User in Dashboard if desired)
+- `partnerUserRecordID` (Reference — set to User in Dashboard if desired)
 
 ### DailyEntry Record
-- `date` (Date/Time) - indexed
-- `authorUserRecordID` (Reference → User) - indexed
-- `couple` (Reference → Couple)
+- `date` (Date/Time) - indexed (Queryable)
+- `authorUserRecordID` (Reference — optional Queryable index if you need author filters)
+- `couple` (Reference — optional constraint to Couple in Dashboard)
 - `morningNeed` (String, optional)
 - `eveningMood` (Int64, optional) - 0/1/2
 - `gratitude` (String, optional)
@@ -330,4 +332,3 @@ Private app for personal use by Jarad and Laura.
 **Questions?**: Review the documentation files or check Xcode console for errors
 
 Built with ❤️ for daily connection
-

@@ -2,7 +2,7 @@
 //  Mood.swift
 //  RelationshipCheckin
 //
-//  Updated with custom palette - 10/10/2025
+//  Updated with adaptive dark mode colors - 10/26/2025
 //
 
 import Foundation
@@ -18,6 +18,18 @@ enum Mood: Int, CaseIterable, Codable {
         case .great: return DesignSystem.Colors.moodGreat // Purple
         case .okay: return DesignSystem.Colors.moodOkay // Gold
         case .difficult: return DesignSystem.Colors.moodDifficult // Navy
+        }
+    }
+    
+    // Adaptive color for dark mode support
+    func adaptiveColor(for scheme: ColorScheme) -> Color {
+        switch self {
+        case .great: 
+            return scheme == .dark ? DesignSystem.Colors.moodGreatDark : DesignSystem.Colors.moodGreat
+        case .okay: 
+            return scheme == .dark ? DesignSystem.Colors.moodOkayDark : DesignSystem.Colors.moodOkay
+        case .difficult: 
+            return scheme == .dark ? DesignSystem.Colors.moodDifficultDark : DesignSystem.Colors.moodDifficult
         }
     }
     

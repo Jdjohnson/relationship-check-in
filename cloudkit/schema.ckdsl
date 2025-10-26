@@ -1,0 +1,40 @@
+DEFINE SCHEMA
+
+    RECORD TYPE Couple (
+        "___createTime"     TIMESTAMP,
+        "___createdBy"      REFERENCE,
+        "___etag"           STRING,
+        "___modTime"        TIMESTAMP,
+        "___modifiedBy"     REFERENCE,
+        "___recordID"       REFERENCE,
+        ownerUserRecordID   REFERENCE,
+        partnerUserRecordID REFERENCE
+    );
+
+    RECORD TYPE DailyEntry (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        authorUserRecordID REFERENCE,
+        couple             REFERENCE,
+        date               TIMESTAMP QUERYABLE,
+        eveningMood        INT64,
+        gratitude          STRING,
+        morningNeed        STRING,
+        tomorrowGreat      STRING
+    );
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );

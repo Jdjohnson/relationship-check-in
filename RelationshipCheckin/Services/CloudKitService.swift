@@ -127,7 +127,8 @@ class CloudKitService: ObservableObject {
 
     func ensureCouple() async throws -> CKRecord {
         if let coupleRecordID = coupleRecordID {
-            for database in [sharedDatabase, privateDatabase] {
+            // Prefer the owner's private DB record to create/modify shares.
+            for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
                     self.coupleRecordID = record.recordID
                     return record
@@ -138,7 +139,7 @@ class CloudKitService: ObservableObject {
         await checkPairingStatus()
 
         if let coupleRecordID = coupleRecordID {
-            for database in [sharedDatabase, privateDatabase] {
+            for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
                     self.coupleRecordID = record.recordID
                     return record

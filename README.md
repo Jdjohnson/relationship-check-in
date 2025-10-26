@@ -109,7 +109,8 @@ Deploy via TestFlight:
 3. Add both users as internal testers
 4. Deploy CloudKit schema from Development to Production
 
+Schema definition source of truth: `CloudKit/schema.ckdsl` (import or verify in CloudKit Dashboard before releasing builds).
+
 ## License
 
 Private app for personal use.
-

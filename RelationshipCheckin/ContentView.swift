@@ -30,12 +30,13 @@ struct ContentView: View {
 }
 
 struct LoadingScreen: View {
+    @Environment(\.colorScheme) var colorScheme
     var body: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    DesignSystem.Colors.lightLavender.opacity(0.3),
-                    DesignSystem.Colors.background
+                    DesignSystem.Colors.secondaryBackground(for: colorScheme).opacity(0.3),
+                    DesignSystem.Colors.background(for: colorScheme)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -51,7 +52,7 @@ struct LoadingScreen: View {
                     
                     Image(systemName: "heart.fill")
                         .font(.system(size: 40))
-                        .foregroundStyle(DesignSystem.Colors.pureWhite)
+                        .foregroundStyle(.white)
                 }
                 
                 ProgressView()
@@ -60,7 +61,7 @@ struct LoadingScreen: View {
                 
                 Text("Setting up...")
                     .font(DesignSystem.Typography.subheadline)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             }
         }
     }

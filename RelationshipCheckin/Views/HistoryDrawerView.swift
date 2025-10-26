@@ -8,13 +8,14 @@
 import SwiftUI
 
 struct HistoryDrawerView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var viewModel = HistoryViewModel()
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             ZStack {
-                DesignSystem.Colors.background
+                DesignSystem.Colors.background(for: colorScheme)
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -79,11 +80,15 @@ struct HistoryDrawerView: View {
                 HStack(spacing: DesignSystem.Spacing.sm) {
                     Image(systemName: isPartner ? "heart.fill" : "person.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(isPartner ? DesignSystem.Colors.accent : DesignSystem.Colors.warmGold)
+                        .foregroundStyle(
+                            isPartner ? 
+                                (colorScheme == .dark ? DesignSystem.Colors.accentBright : DesignSystem.Colors.accent) :
+                                (colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold)
+                        )
                     
                     Text(isPartner ? "Partner" : "You")
                         .font(DesignSystem.Typography.headline)
-                        .foregroundStyle(DesignSystem.Colors.textPrimary)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                     
                     Spacer()
                 }
@@ -97,12 +102,13 @@ struct HistoryDrawerView: View {
                         HStack(spacing: DesignSystem.Spacing.sm) {
                             Image(systemName: "moon.stars.fill")
                                 .font(.system(size: 12))
-                                .foregroundStyle(DesignSystem.Colors.primaryPurple)
+                                .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                             Circle()
-                                .fill(mood.color)
+                                .fill(mood.adaptiveColor(for: colorScheme))
                                 .frame(width: 12, height: 12)
                             Text(mood.displayName)
                                 .font(DesignSystem.Typography.caption)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                         }
                     }
                     
@@ -122,10 +128,10 @@ struct HistoryDrawerView: View {
         HStack(alignment: .top, spacing: DesignSystem.Spacing.sm) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             Text(text)
                 .font(DesignSystem.Typography.caption)
-                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                 .lineLimit(2)
         }
     }
@@ -134,10 +140,10 @@ struct HistoryDrawerView: View {
         LiquidGlassCard(padding: DesignSystem.Spacing.md) {
             HStack(spacing: DesignSystem.Spacing.sm) {
                 Image(systemName: "calendar.badge.exclamationmark")
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary(for: colorScheme))
                 Text(isPartner ? "Partner didn't check in" : "You didn't check in")
                     .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             }
         }
     }

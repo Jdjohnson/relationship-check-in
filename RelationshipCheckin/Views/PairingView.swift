@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct PairingView: View {
+    @Environment(\.colorScheme) var colorScheme
     @StateObject private var viewModel = PairingViewModel()
     @State private var showAcceptSheet = false
     @State private var inviteLinkText = ""
@@ -17,8 +18,8 @@ struct PairingView: View {
             // Subtle gradient background
             LinearGradient(
                 colors: [
-                    DesignSystem.Colors.lightLavender.opacity(0.3),
-                    DesignSystem.Colors.background
+                    DesignSystem.Colors.secondaryBackground(for: colorScheme).opacity(0.3),
+                    DesignSystem.Colors.background(for: colorScheme)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -62,23 +63,26 @@ struct PairingView: View {
         VStack(spacing: DesignSystem.Spacing.lg) {
             ZStack {
                 Circle()
-                    .fill(DesignSystem.Colors.primaryPurple)
+                    .fill(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                     .frame(width: 96, height: 96)
-                    .shadow(color: DesignSystem.Colors.primaryPurple.opacity(0.3), radius: 20)
+                    .shadow(
+                        color: (colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple).opacity(0.3),
+                        radius: 20
+                    )
                 
                 Image(systemName: "heart.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(DesignSystem.Colors.pureWhite)
+                    .foregroundStyle(.white)
             }
             
             VStack(spacing: DesignSystem.Spacing.sm) {
                 Text("Daily Connection")
                     .font(DesignSystem.Typography.largeTitle)
-                    .foregroundStyle(DesignSystem.Colors.textPrimary)
+                    .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                 
                 Text("Share your day together")
                     .font(DesignSystem.Typography.body)
-                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
             }
         }
     }
@@ -92,20 +96,20 @@ struct PairingView: View {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     HStack(spacing: DesignSystem.Spacing.sm) {
                         Circle()
-                            .fill(DesignSystem.Colors.primaryPurple.opacity(0.2))
+                            .fill((colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple).opacity(0.2))
                             .frame(width: 40, height: 40)
                             .overlay {
                                 Image(systemName: "link.circle.fill")
-                                    .foregroundStyle(DesignSystem.Colors.primaryPurple)
+                                    .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.primaryPurpleBright : DesignSystem.Colors.primaryPurple)
                             }
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Create Invite")
                                 .font(DesignSystem.Typography.headline)
-                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                             Text("Start by inviting")
                                 .font(DesignSystem.Typography.caption)
-                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
                         }
                         
                         Spacer()
@@ -124,13 +128,13 @@ struct PairingView: View {
             // Divider
             HStack {
                 Rectangle()
-                    .fill(DesignSystem.Colors.textTertiary.opacity(0.3))
+                    .fill(DesignSystem.Colors.textTertiary(for: colorScheme).opacity(0.3))
                     .frame(height: 1)
                 Text("or")
                     .font(DesignSystem.Typography.caption)
-                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+                    .foregroundStyle(DesignSystem.Colors.textTertiary(for: colorScheme))
                 Rectangle()
-                    .fill(DesignSystem.Colors.textTertiary.opacity(0.3))
+                    .fill(DesignSystem.Colors.textTertiary(for: colorScheme).opacity(0.3))
                     .frame(height: 1)
             }
             
@@ -139,20 +143,20 @@ struct PairingView: View {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     HStack(spacing: DesignSystem.Spacing.sm) {
                         Circle()
-                            .fill(DesignSystem.Colors.warmGold.opacity(0.2))
+                            .fill((colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold).opacity(0.2))
                             .frame(width: 40, height: 40)
                             .overlay {
                                 Image(systemName: "envelope.circle.fill")
-                                    .foregroundStyle(DesignSystem.Colors.warmGold)
+                                    .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold)
                             }
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Accept Invite")
                                 .font(DesignSystem.Typography.headline)
-                                .foregroundStyle(DesignSystem.Colors.textPrimary)
+                                .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                             Text("Join your partner")
                                 .font(DesignSystem.Typography.caption)
-                                .foregroundStyle(DesignSystem.Colors.textSecondary)
+                                .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
                         }
                         
                         Spacer()
@@ -188,6 +192,7 @@ struct PairingView: View {
 // MARK: - Accept Sheet
 
 struct AcceptInviteSheet: View {
+    @Environment(\.colorScheme) var colorScheme
     @ObservedObject var viewModel: PairingViewModel
     @Binding var inviteLinkText: String
     @Binding var isPresented: Bool
@@ -196,35 +201,36 @@ struct AcceptInviteSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DesignSystem.Colors.background
+                DesignSystem.Colors.background(for: colorScheme)
                     .ignoresSafeArea()
                 
                 VStack(spacing: DesignSystem.Spacing.lg) {
                     Circle()
-                        .fill(DesignSystem.Colors.warmGold.opacity(0.2))
+                        .fill((colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold).opacity(0.2))
                         .frame(width: 80, height: 80)
                         .overlay {
                             Image(systemName: "envelope.open.fill")
                                 .font(.system(size: 36))
-                                .foregroundStyle(DesignSystem.Colors.warmGold)
+                                .foregroundStyle(colorScheme == .dark ? DesignSystem.Colors.warmGoldBright : DesignSystem.Colors.warmGold)
                         }
                         .padding(.top, DesignSystem.Spacing.xxl)
                     
                     VStack(spacing: DesignSystem.Spacing.sm) {
                         Text("Paste Invite Link")
                             .font(DesignSystem.Typography.title2)
-                            .foregroundStyle(DesignSystem.Colors.textPrimary)
+                            .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                         Text("From your partner")
                             .font(DesignSystem.Typography.subheadline)
-                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
                     }
                     
                     TextField("https://...", text: $inviteLinkText)
                         .font(DesignSystem.Typography.body)
+                        .foregroundStyle(DesignSystem.Colors.textPrimary(for: colorScheme))
                         .padding(DesignSystem.Spacing.md)
                         .background {
                             RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.sm, style: .continuous)
-                                .fill(DesignSystem.Colors.lightLavender.opacity(0.4))
+                                .fill(DesignSystem.Colors.inputBackground(for: colorScheme))
                         }
                         .autocapitalization(.none)
                         .autocorrectionDisabled()
@@ -258,7 +264,7 @@ struct AcceptInviteSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { isPresented = false }
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary(for: colorScheme))
                 }
             }
             .onAppear { isFocused = true }

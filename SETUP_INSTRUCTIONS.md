@@ -93,13 +93,14 @@ Replace the default `RelationshipCheckinApp.swift` and `ContentView.swift` with 
 - Click **+** to add new Record Type
 - Name: `DailyEntry`
 - Add Fields:
-  - `date` - Type: Date/Time
-  - `authorUserRecordID` - Type: Reference (User)
+  - `date` - Type: Date/Time (add Queryable index)
+  - `authorUserRecordID` - Type: Reference (User, optional Queryable index if you need author filters)
   - `morningNeed` - Type: String
   - `eveningMood` - Type: Int(64)
   - `gratitude` - Type: String
   - `tomorrowGreat` - Type: String
-  - `couple` - Type: Reference (Couple)
+  - `couple` - Type: Reference (Couple if you want to constrain it)
+- Keep this list in sync with `CloudKit/schema.ckdsl`.
 
 #### Create Custom Zone
 The app will automatically create the custom zone `RelationshipZone` on first launch.

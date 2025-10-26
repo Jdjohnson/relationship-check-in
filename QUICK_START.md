@@ -181,7 +181,7 @@ Edit `EntryView.swift` to add additional fields, then update:
 
 For issues:
 1. Check SETUP_INSTRUCTIONS.md
-2. Review CLOUDKIT_SCHEMA.md
+2. Review CLOUDKIT_SCHEMA.md and `CloudKit/schema.ckdsl`
 3. Check Xcode console for errors
 4. Verify CloudKit Dashboard shows records
 
@@ -210,4 +210,3 @@ Consider adding:
 Enjoy your daily connection! ❤️
 
 Built with love for Jarad & Laura
-

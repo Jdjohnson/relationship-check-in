@@ -130,7 +130,7 @@ Relationship Check-in/
 ### Configuration
 - **App capabilities**: `RelationshipCheckin.entitlements`
 - **URL schemes**: `Info.plist`
-- **CloudKit schema**: [CLOUDKIT_SCHEMA.md](CLOUDKIT_SCHEMA.md)
+- **CloudKit schema**: [CLOUDKIT_SCHEMA.md](CLOUDKIT_SCHEMA.md), `CloudKit/schema.ckdsl`
 
 ## 🎨 Customization Guide
 
@@ -319,4 +319,3 @@ Built with love for Jarad & Laura's daily connection.
 **Version**: 1.0  
 **Created**: October 10, 2025  
 **Status**: ✅ Complete and ready to build
-

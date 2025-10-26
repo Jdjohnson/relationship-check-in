@@ -23,25 +23,78 @@ class ShareService: ObservableObject {
     
     // MARK: - Create Share
     
-    func createShare(for coupleRecord: CKRecord) async throws -> CKShare {
-        let share = CKShare(rootRecord: coupleRecord)
-        share.publicPermission = .readWrite
-        share[CKShare.SystemFieldKey.title] = "Relationship Check-in" as CKRecordValue
-        
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
-        let privateDB = container.privateCloudDatabase
-        
-        // Save both the record and share
-        let (savedRecords, _) = try await privateDB.modifyRecords(saving: [coupleRecord, share], deleting: [])
-        
-        // Find the saved share in the results
-        for (_, result) in savedRecords {
-            if let record = try? result.get(), let savedShare = record as? CKShare {
-                return savedShare
+    private func fetchExistingShare(for rootID: CKRecord.ID, in db: CKDatabase) async throws -> CKShare? {
+        let predicate = NSPredicate(format: "rootRecord == %@", rootID)
+        let query = CKQuery(recordType: "cloudkit.share", predicate: predicate)
+
+        do {
+            let (results, _) = try await db.records(matching: query, inZoneWith: rootID.zoneID)
+            for (_, result) in results {
+                if case .success(let record as CKShare) = result {
+                    return record
+                }
             }
+            return nil
+        } catch let ck as CKError where
+            ck.code == .unknownItem ||
+            ck.code == .zoneNotFound ||
+            ck.code == .invalidArguments {
+            return nil
+        }
+    }
+    
+    func createShare(for coupleRecord: CKRecord) async throws -> CKShare {
+        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
+        let db = container.privateCloudDatabase
+        
+        let root: CKRecord
+        do {
+            root = try await db.record(for: coupleRecord.recordID)
+        } catch let ck as CKError where ck.code == .unknownItem || ck.code == .permissionFailure {
+            throw NSError(
+                domain: "ShareService",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "This Couple belongs to your partner. Only the owner can create invites."]
+            )
         }
         
-        throw NSError(domain: "ShareService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create share"])
+        func attemptCreate(with record: CKRecord) async throws -> CKShare {
+            let share = CKShare(rootRecord: record)
+            share.publicPermission = .readWrite
+            share[CKShare.SystemFieldKey.title] = "Relationship Check-in" as CKRecordValue
+            
+            let (saved, _) = try await db.modifyRecords(saving: [record, share], deleting: [])
+            if let result = saved[share.recordID] {
+                switch result {
+                case .success(let record as CKShare):
+                    return record
+                case .success:
+                    throw NSError(
+                        domain: "ShareService",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Unexpected share save result"]
+                    )
+                case .failure(let error):
+                    throw error
+                }
+            }
+            throw NSError(
+                domain: "ShareService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Share missing from modifyRecords results"]
+            )
+        }
+        
+        do {
+            return try await attemptCreate(with: root)
+        } catch let ck as CKError {
+            if ck.code == .serverRecordChanged {
+                if let existing = try await fetchExistingShare(for: root.recordID, in: db) {
+                    return existing
+                }
+            }
+            throw ck
+        }
     }
     
     func getShareURL(for share: CKShare) -> URL? {
