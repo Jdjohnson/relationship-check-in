@@ -10,6 +10,7 @@ import UserNotifications
 
 @main
 struct RelationshipCheckinApp: App {
+    @UIApplicationDelegateAdaptor(RCAppDelegate.self) var appDelegate
     @StateObject private var cloudKitService = CloudKitService.shared
     @StateObject private var notificationService = NotificationService.shared
     @StateObject private var deepLinkService = DeepLinkService.shared
@@ -59,4 +60,3 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Observab
         completionHandler([.banner, .sound, .badge])
     }
 }
-

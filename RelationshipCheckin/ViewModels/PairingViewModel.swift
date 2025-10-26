@@ -22,9 +22,27 @@ class PairingViewModel: ObservableObject {
     
     private var coupleRecord: CKRecord?
     private var share: CKShare?
+    private var shareAcceptedObserver: NSObjectProtocol?
     
     // MARK: - Create Invite Link
     
+    init() {
+        shareAcceptedObserver = NotificationCenter.default.addObserver(
+            forName: .rcShareAccepted,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.refreshAfterShareAccepted() }
+        }
+    }
+    
+    deinit {
+        if let observer = shareAcceptedObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     func createInviteLink() async {
         isCreatingLink = true
         error = nil
@@ -56,6 +74,16 @@ class PairingViewModel: ObservableObject {
                 self.error = "Failed to create invite link: \(error.localizedDescription)"
             }
             isCreatingLink = false
+        }
+    }
+    
+    @MainActor
+    func refreshAfterShareAccepted() async {
+        do {
+            _ = try await cloudKitService.ensureCouple()
+            self.error = nil
+        } catch {
+            self.error = "Paired, but failed to sync: \(error.localizedDescription)"
         }
     }
     

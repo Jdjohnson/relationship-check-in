@@ -1002,6 +1002,52 @@ For this app with 2 users and text-only data:
 
 ```
 
+# cloudkit/schema.ckdsl
+
+```ckdsl
+DEFINE SCHEMA
+
+    RECORD TYPE Couple (
+        "___createTime"     TIMESTAMP,
+        "___createdBy"      REFERENCE,
+        "___etag"           STRING,
+        "___modTime"        TIMESTAMP,
+        "___modifiedBy"     REFERENCE,
+        "___recordID"       REFERENCE,
+        ownerUserRecordID   REFERENCE,
+        partnerUserRecordID REFERENCE
+    );
+
+    RECORD TYPE DailyEntry (
+        "___createTime"    TIMESTAMP,
+        "___createdBy"     REFERENCE,
+        "___etag"          STRING,
+        "___modTime"       TIMESTAMP,
+        "___modifiedBy"    REFERENCE,
+        "___recordID"      REFERENCE,
+        authorUserRecordID REFERENCE,
+        couple             REFERENCE,
+        date               TIMESTAMP QUERYABLE,
+        eveningMood        INT64,
+        gratitude          STRING,
+        morningNeed        STRING,
+        tomorrowGreat      STRING
+    );
+
+    RECORD TYPE Users (
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE,
+        roles           LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );
+
+```
+
 # DEPLOYMENT_CHECKLIST.md
 
 ```md
@@ -2522,6 +2568,7 @@ Private app for personal use.
 		AA0015 /* HistoryDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0015 /* HistoryDrawerView.swift */; };
 		AA0016 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0016 /* PairingView.swift */; };
 		AA0017 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0017 /* DesignSystem.swift */; };
+		AA0018 /* AppDelegate+CloudKitShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* AppDelegate+CloudKitShare.swift */; };
 		PP0001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = QQ0001 /* Assets.xcassets */; };
 		PP0002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = QQ0002 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -2544,6 +2591,7 @@ Private app for personal use.
 		BB0015 /* HistoryDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDrawerView.swift; sourceTree = "<group>"; };
 		BB0016 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		BB0017 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		BB0018 /* AppDelegate+CloudKitShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Infrastructure/AppDelegate+CloudKitShare.swift"; sourceTree = "<group>"; };
 		CC0001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DD0001 /* RelationshipCheckin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RelationshipCheckin.entitlements; sourceTree = "<group>"; };
 		EE0001 /* RelationshipCheckin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RelationshipCheckin.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2581,6 +2629,7 @@ Private app for personal use.
 				CC0001 /* Info.plist */,
 				QQ0001 /* Assets.xcassets */,
 				QQ0002 /* PrivacyInfo.xcprivacy */,
+				GG0010 /* Infrastructure */,
 				GG0004 /* Models */,
 				GG0005 /* Services */,
 				GG0006 /* ViewModels */,
@@ -2646,6 +2695,14 @@ Private app for personal use.
 				BB0017 /* DesignSystem.swift */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		GG0010 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				BB0018 /* AppDelegate+CloudKitShare.swift */,
+			);
+			path = Infrastructure;
 			sourceTree = "<group>";
 		};
 		GG0009 /* Scripts */ = {
@@ -2743,6 +2800,7 @@ Private app for personal use.
 				AA0015 /* HistoryDrawerView.swift in Sources */,
 				AA0016 /* PairingView.swift in Sources */,
 				AA0017 /* DesignSystem.swift in Sources */,
+				AA0018 /* AppDelegate+CloudKitShare.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3641,6 +3699,34 @@ struct LoadingScreen: View {
 
 ```
 
+# RelationshipCheckin/Infrastructure/AppDelegate+CloudKitShare.swift
+
+```swift
+import UIKit
+import CloudKit
+
+final class RCAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        Task {
+            do {
+                let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
+                _ = try await container.accept([metadata])
+                NotificationCenter.default.post(name: .rcShareAccepted, object: nil)
+            } catch {
+                NotificationCenter.default.post(name: .rcShareFailed, object: error)
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    static let rcShareAccepted = Notification.Name("rcShareAccepted")
+    static let rcShareFailed = Notification.Name("rcShareFailed")
+}
+
+```
+
 # RelationshipCheckin/Models/DailyEntry.swift
 
 ```swift
@@ -3825,6 +3911,7 @@ import UserNotifications
 
 @main
 struct RelationshipCheckinApp: App {
+    @UIApplicationDelegateAdaptor(RCAppDelegate.self) var appDelegate
     @StateObject private var cloudKitService = CloudKitService.shared
     @StateObject private var notificationService = NotificationService.shared
     @StateObject private var deepLinkService = DeepLinkService.shared
@@ -3874,7 +3961,6 @@ class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Observab
         completionHandler([.banner, .sound, .badge])
     }
 }
-
 
 ```
 
@@ -4038,7 +4124,8 @@ class CloudKitService: ObservableObject {
 
     func ensureCouple() async throws -> CKRecord {
         if let coupleRecordID = coupleRecordID {
-            for database in [sharedDatabase, privateDatabase] {
+            // Prefer the owner's private DB record to create/modify shares.
+            for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
                     self.coupleRecordID = record.recordID
                     return record
@@ -4049,7 +4136,7 @@ class CloudKitService: ObservableObject {
         await checkPairingStatus()
 
         if let coupleRecordID = coupleRecordID {
-            for database in [sharedDatabase, privateDatabase] {
+            for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
                     self.coupleRecordID = record.recordID
                     return record
@@ -4394,25 +4481,78 @@ class ShareService: ObservableObject {
     
     // MARK: - Create Share
     
-    func createShare(for coupleRecord: CKRecord) async throws -> CKShare {
-        let share = CKShare(rootRecord: coupleRecord)
-        share.publicPermission = .readWrite
-        share[CKShare.SystemFieldKey.title] = "Relationship Check-in" as CKRecordValue
-        
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
-        let privateDB = container.privateCloudDatabase
-        
-        // Save both the record and share
-        let (savedRecords, _) = try await privateDB.modifyRecords(saving: [coupleRecord, share], deleting: [])
-        
-        // Find the saved share in the results
-        for (_, result) in savedRecords {
-            if let record = try? result.get(), let savedShare = record as? CKShare {
-                return savedShare
+    private func fetchExistingShare(for rootID: CKRecord.ID, in db: CKDatabase) async throws -> CKShare? {
+        let predicate = NSPredicate(format: "rootRecord == %@", rootID)
+        let query = CKQuery(recordType: "cloudkit.share", predicate: predicate)
+
+        do {
+            let (results, _) = try await db.records(matching: query, inZoneWith: rootID.zoneID)
+            for (_, result) in results {
+                if case .success(let record as CKShare) = result {
+                    return record
+                }
             }
+            return nil
+        } catch let ck as CKError where
+            ck.code == .unknownItem ||
+            ck.code == .zoneNotFound ||
+            ck.code == .invalidArguments {
+            return nil
+        }
+    }
+    
+    func createShare(for coupleRecord: CKRecord) async throws -> CKShare {
+        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
+        let db = container.privateCloudDatabase
+        
+        let root: CKRecord
+        do {
+            root = try await db.record(for: coupleRecord.recordID)
+        } catch let ck as CKError where ck.code == .unknownItem || ck.code == .permissionFailure {
+            throw NSError(
+                domain: "ShareService",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "This Couple belongs to your partner. Only the owner can create invites."]
+            )
         }
         
-        throw NSError(domain: "ShareService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create share"])
+        func attemptCreate(with record: CKRecord) async throws -> CKShare {
+            let share = CKShare(rootRecord: record)
+            share.publicPermission = .readWrite
+            share[CKShare.SystemFieldKey.title] = "Relationship Check-in" as CKRecordValue
+            
+            let (saved, _) = try await db.modifyRecords(saving: [record, share], deleting: [])
+            if let result = saved[share.recordID] {
+                switch result {
+                case .success(let record as CKShare):
+                    return record
+                case .success:
+                    throw NSError(
+                        domain: "ShareService",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Unexpected share save result"]
+                    )
+                case .failure(let error):
+                    throw error
+                }
+            }
+            throw NSError(
+                domain: "ShareService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Share missing from modifyRecords results"]
+            )
+        }
+        
+        do {
+            return try await attemptCreate(with: root)
+        } catch let ck as CKError {
+            if ck.code == .serverRecordChanged {
+                if let existing = try await fetchExistingShare(for: root.recordID, in: db) {
+                    return existing
+                }
+            }
+            throw ck
+        }
     }
     
     func getShareURL(for share: CKShare) -> URL? {
@@ -5210,9 +5350,27 @@ class PairingViewModel: ObservableObject {
     
     private var coupleRecord: CKRecord?
     private var share: CKShare?
+    private var shareAcceptedObserver: NSObjectProtocol?
     
     // MARK: - Create Invite Link
     
+    init() {
+        shareAcceptedObserver = NotificationCenter.default.addObserver(
+            forName: .rcShareAccepted,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.refreshAfterShareAccepted() }
+        }
+    }
+    
+    deinit {
+        if let observer = shareAcceptedObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     func createInviteLink() async {
         isCreatingLink = true
         error = nil
@@ -5234,15 +5392,26 @@ class PairingViewModel: ObservableObject {
             
             isCreatingLink = false
         } catch {
-            if let ckError = error as? CKError,
-               ckError.code == .serverRejectedRequest ||
-                ckError.code == .unknownItem ||
-                ckError.code == .partialFailure {
-                self.error = "CloudKit schema isn’t in Production (or doesn’t match). Deploy from CloudKit Dashboard → Schema → Development → Deploy to Production, then try again."
+            if let nsError = error as NSError?,
+               nsError.domain == "ShareService",
+               nsError.code == -2 {
+                self.error = "Only the owner can create invites. Ask your partner to use Accept Invite."
+            } else if let ck = error as? CKError {
+                self.error = "CloudKit: \(ck.code) – \(ck.localizedDescription)"
             } else {
-                self.error = "Failed to create invite link: \(ckExplain(error))"
+                self.error = "Failed to create invite link: \(error.localizedDescription)"
             }
             isCreatingLink = false
+        }
+    }
+    
+    @MainActor
+    func refreshAfterShareAccepted() async {
+        do {
+            _ = try await cloudKitService.ensureCouple()
+            self.error = nil
+        } catch {
+            self.error = "Paired, but failed to sync: \(error.localizedDescription)"
         }
     }
     
@@ -6233,6 +6402,52 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+
+```
+
+# Schema/cloudkit_schema_update.ckschema
+
+```ckschema
+DEFINE SCHEMA
+
+RECORD TYPE Couple (
+    "___createTime"     TIMESTAMP,
+    "___createdBy"      REFERENCE,
+    "___etag"           STRING,
+    "___modTime"        TIMESTAMP,
+    "___modifiedBy"     REFERENCE,
+    "___recordID"       REFERENCE,
+    ownerUserRecordID   REFERENCE QUERYABLE,
+    partnerUserRecordID REFERENCE QUERYABLE
+);
+
+RECORD TYPE DailyEntry (
+    "___createTime"    TIMESTAMP,
+    "___createdBy"     REFERENCE,
+    "___etag"          STRING,
+    "___modTime"       TIMESTAMP,
+    "___modifiedBy"    REFERENCE,
+    "___recordID"      REFERENCE,
+    authorUserRecordID REFERENCE QUERYABLE,
+    couple             REFERENCE QUERYABLE,
+    date               TIMESTAMP QUERYABLE SORTABLE,
+    eveningMood        INT64,
+    gratitude          STRING,
+    morningNeed        STRING,
+    tomorrowGreat      STRING
+);
+
+RECORD TYPE Users (
+    "___createTime" TIMESTAMP,
+    "___createdBy"  REFERENCE,
+    "___etag"       STRING,
+    "___modTime"    TIMESTAMP,
+    "___modifiedBy" REFERENCE,
+    "___recordID"   REFERENCE,
+    roles           LIST<INT64>,
+    GRANT WRITE TO "_creator",
+    GRANT READ  TO "_world"
+);
 
 ```
 

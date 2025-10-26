@@ -24,6 +24,7 @@
 		AA0015 /* HistoryDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0015 /* HistoryDrawerView.swift */; };
 		AA0016 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0016 /* PairingView.swift */; };
 		AA0017 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0017 /* DesignSystem.swift */; };
+		AA0018 /* AppDelegate+CloudKitShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0018 /* AppDelegate+CloudKitShare.swift */; };
 		PP0001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = QQ0001 /* Assets.xcassets */; };
 		PP0002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = QQ0002 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -46,6 +47,7 @@
 		BB0015 /* HistoryDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryDrawerView.swift; sourceTree = "<group>"; };
 		BB0016 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
 		BB0017 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		BB0018 /* AppDelegate+CloudKitShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Infrastructure/AppDelegate+CloudKitShare.swift"; sourceTree = "<group>"; };
 		CC0001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DD0001 /* RelationshipCheckin.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RelationshipCheckin.entitlements; sourceTree = "<group>"; };
 		EE0001 /* RelationshipCheckin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RelationshipCheckin.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,6 +85,7 @@
 				CC0001 /* Info.plist */,
 				QQ0001 /* Assets.xcassets */,
 				QQ0002 /* PrivacyInfo.xcprivacy */,
+				GG0010 /* Infrastructure */,
 				GG0004 /* Models */,
 				GG0005 /* Services */,
 				GG0006 /* ViewModels */,
@@ -148,6 +151,14 @@
 				BB0017 /* DesignSystem.swift */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		GG0010 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				BB0018 /* AppDelegate+CloudKitShare.swift */,
+			);
+			path = Infrastructure;
 			sourceTree = "<group>";
 		};
 		GG0009 /* Scripts */ = {
@@ -245,6 +256,7 @@
 				AA0015 /* HistoryDrawerView.swift in Sources */,
 				AA0016 /* PairingView.swift in Sources */,
 				AA0017 /* DesignSystem.swift in Sources */,
+				AA0018 /* AppDelegate+CloudKitShare.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
