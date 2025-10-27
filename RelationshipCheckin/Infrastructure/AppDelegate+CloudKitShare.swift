@@ -3,6 +3,12 @@ import CloudKit
 
 final class RCAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        CloudKitService.shared.restorePersistedState()
+        return true
+    }
+
+    func application(_ application: UIApplication,
                      userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
         Task { @MainActor in
             do {

@@ -17,6 +17,9 @@ class CloudKitService: ObservableObject {
     private let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
     private let zoneID: CKRecordZone.ID
+    private let defaults: UserDefaults
+    private let coupleRecordDefaultsKey = "CloudKitService.coupleRecordID"
+    private let isPairedDefaultsKey = "CloudKitService.isPaired"
 
     @Published var isInitializing = true
     @Published var isPaired = false
@@ -30,11 +33,15 @@ class CloudKitService: ObservableObject {
         self.privateDatabase = container.privateCloudDatabase
         self.sharedDatabase = container.sharedCloudDatabase
         self.zoneID = CKRecordZone.ID(zoneName: "RelationshipZone", ownerName: CKCurrentUserDefaultName)
+        self.defaults = .standard
+
+        restorePersistedState()
     }
     
     // MARK: - Initialization
 
     func initialize() async {
+        restorePersistedState()
         do {
             // Fetch current user
             let userRecordID = try await container.userRecordID()
@@ -43,7 +50,7 @@ class CloudKitService: ObservableObject {
             try await ensurePrivateZone()
             
             // Check if already paired
-            await checkPairingStatus()
+            try await checkPairingStatus()
             
             self.isInitializing = false
         } catch {
@@ -72,31 +79,27 @@ class CloudKitService: ObservableObject {
         let predicate = NSPredicate(format: "ownerUserRecordID == %@ OR partnerUserRecordID == %@", userRecordID, userRecordID)
         let query = CKQuery(recordType: "Couple", predicate: predicate)
 
-        let (privateMatches, _) = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
-        for (_, result) in privateMatches {
-            if let record = try? result.get() {
-                return record
-            }
+        if let record = try await firstRecord(in: privateDatabase, matching: query) {
+            return record
         }
-
-        let (sharedMatches, _) = try await sharedDatabase.records(matching: query)
-        for (_, result) in sharedMatches {
-            if let record = try? result.get() {
-                return record
-            }
+        if let record = try await firstRecord(in: privateDatabase, matching: query, zoneID: zoneID) {
+            return record
+        }
+        if let record = try await firstRecord(in: sharedDatabase, matching: query) {
+            return record
         }
 
         return nil
     }
     
     private func applyCoupleState(from record: CKRecord) {
-        self.coupleRecordID = record.recordID
+        updateCoupleRecordID(record.recordID)
         if let partnerRef = record["partnerUserRecordID"] as? CKRecord.Reference {
             self.partnerUserRecordID = partnerRef.recordID
-            self.isPaired = true
+            updatePairedState(true)
         } else {
             self.partnerUserRecordID = nil
-            self.isPaired = false
+            updatePairedState(false)
         }
     }
     
@@ -111,30 +114,27 @@ class CloudKitService: ObservableObject {
     
     // MARK: - Pairing
     
-    func checkPairingStatus() async {
-        do {
-            try await ensurePrivateZone()
-            let userRecordID = try await currentUserRecord()
-            if let coupleID = coupleRecordID {
-                for database in [privateDatabase, sharedDatabase] {
-                    if let record = try? await database.record(for: coupleID) {
-                        applyCoupleState(from: record)
-                        return
-                    }
+    func checkPairingStatus() async throws {
+        try await ensurePrivateZone()
+        let userRecordID = try await currentUserRecord()
+
+        if let record = try await findCoupleRecord(for: userRecordID) {
+            applyCoupleState(from: record)
+            return
+        }
+
+        if let cachedID = coupleRecordID {
+            for database in [privateDatabase, sharedDatabase] {
+                if let record = try? await database.record(for: cachedID) {
+                    applyCoupleState(from: record)
+                    return
                 }
             }
-
-            if let record = try await findCoupleRecord(for: userRecordID) {
-                applyCoupleState(from: record)
-            } else {
-                self.partnerUserRecordID = nil
-                self.isPaired = false
-            }
-        } catch {
-            print("Error checking pairing status: \(error)")
-            self.partnerUserRecordID = nil
-            self.isPaired = false
         }
+
+        partnerUserRecordID = nil
+        updateCoupleRecordID(nil)
+        updatePairedState(false)
     }
     
     func createCouple() async throws -> CKRecord {
@@ -155,18 +155,18 @@ class CloudKitService: ObservableObject {
             // Prefer the owner's private DB record to create/modify shares.
             for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
-                    self.coupleRecordID = record.recordID
+                    updateCoupleRecordID(record.recordID)
                     return record
                 }
             }
         }
 
-        await checkPairingStatus()
+        try? await checkPairingStatus()
 
         if let coupleRecordID = coupleRecordID {
             for database in [privateDatabase, sharedDatabase] {
                 if let record = try? await database.record(for: coupleRecordID) {
-                    self.coupleRecordID = record.recordID
+                    updateCoupleRecordID(record.recordID)
                     return record
                 }
             }
@@ -195,7 +195,71 @@ class CloudKitService: ObservableObject {
 
         throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not find couple record"])
     }
-    
+
+    func restorePersistedState() {
+        if let payload = defaults.dictionary(forKey: coupleRecordDefaultsKey) as? [String: String],
+           let recordName = payload["recordName"] {
+            let zoneName = payload["zoneName"] ?? zoneID.zoneName
+            let ownerName = payload["ownerName"] ?? zoneID.ownerName
+            let restoredZone = CKRecordZone.ID(zoneName: zoneName, ownerName: ownerName)
+            let recordID = CKRecord.ID(recordName: recordName, zoneID: restoredZone)
+            updateCoupleRecordID(recordID)
+        }
+
+        if defaults.object(forKey: isPairedDefaultsKey) != nil {
+            updatePairedState(defaults.bool(forKey: isPairedDefaultsKey))
+        }
+    }
+
+    func cacheCoupleRecordID(_ id: CKRecord.ID?) {
+        updateCoupleRecordID(id)
+    }
+
+    private func firstRecord(in database: CKDatabase, matching query: CKQuery, zoneID: CKRecordZone.ID? = nil) async throws -> CKRecord? {
+        do {
+            let results: (matchResults: [(CKRecord.ID, Result<CKRecord, Error>)], queryCursor: CKQueryOperation.Cursor?)
+            if let zoneID {
+                results = try await database.records(matching: query, inZoneWith: zoneID)
+            } else {
+                results = try await database.records(matching: query)
+            }
+
+            for (_, result) in results.matchResults {
+                if let record = try? result.get() {
+                    return record
+                }
+            }
+            return nil
+        } catch let ckError as CKError where ckError.code == .zoneNotFound || ckError.code == .unknownItem {
+            return nil
+        } catch {
+            throw error
+        }
+    }
+
+    private func updateCoupleRecordID(_ id: CKRecord.ID?) {
+        coupleRecordID = id
+        persistCoupleRecordID(id)
+    }
+
+    private func persistCoupleRecordID(_ id: CKRecord.ID?) {
+        if let id {
+            let payload: [String: String] = [
+                "recordName": id.recordName,
+                "zoneName": id.zoneID.zoneName,
+                "ownerName": id.zoneID.ownerName
+            ]
+            defaults.set(payload, forKey: coupleRecordDefaultsKey)
+        } else {
+            defaults.removeObject(forKey: coupleRecordDefaultsKey)
+        }
+    }
+
+    private func updatePairedState(_ value: Bool) {
+        isPaired = value
+        defaults.set(value, forKey: isPairedDefaultsKey)
+    }
+
     // MARK: - Daily Entries
     
     func upsertDailyEntry(_ entry: DailyEntry) async throws {

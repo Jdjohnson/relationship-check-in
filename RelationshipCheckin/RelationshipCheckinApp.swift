@@ -10,6 +10,7 @@ import UserNotifications
 
 @main
 struct RelationshipCheckinApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(RCAppDelegate.self) var appDelegate
     @StateObject private var cloudKitService = CloudKitService.shared
     @StateObject private var notificationService = NotificationService.shared
@@ -36,6 +37,10 @@ struct RelationshipCheckinApp: App {
                     await cloudKitService.initialize()
                     await notificationService.requestPermission()
                     notificationService.scheduleNotifications()
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    guard newPhase == .active else { return }
+                    Task { try? await cloudKitService.checkPairingStatus() }
                 }
         }
     }

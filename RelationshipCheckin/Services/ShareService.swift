@@ -125,10 +125,10 @@ class ShareService: ObservableObject {
 
             if cloudKitService.coupleRecordID == nil,
                let rootRecordID = extractRootRecordID(from: metadata) {
-                cloudKitService.coupleRecordID = rootRecordID
+                cloudKitService.cacheCoupleRecordID(rootRecordID)
             }
 
-            await cloudKitService.checkPairingStatus()
+            try await cloudKitService.checkPairingStatus()
             try await cloudKitService.updateCoupleWithPartner(partnerRecordID: userRecordID)
             self.error = nil
         } catch {
@@ -137,7 +137,7 @@ class ShareService: ObservableObject {
                 let userRecordID = try await container.userRecordID()
                 cloudKitService.currentUserRecordID = userRecordID
 
-                await cloudKitService.checkPairingStatus()
+                try await cloudKitService.checkPairingStatus()
                 try await cloudKitService.updateCoupleWithPartner(partnerRecordID: userRecordID)
                 self.error = nil
                 return

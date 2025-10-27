@@ -8,6 +8,8 @@
 import Foundation
 import CloudKit
 import SwiftUI
+import UIKit
+import Combine
 
 @MainActor
 class PairingViewModel: ObservableObject {
@@ -23,6 +25,8 @@ class PairingViewModel: ObservableObject {
     private var share: CKShare?
     private var shareAcceptedObserver: NSObjectProtocol?
     private var shareFailedObserver: NSObjectProtocol?
+    private var scenePhaseCancellable: AnyCancellable?
+    private var pairingWatcherTask: Task<Void, Never>?
     
     // MARK: - Create Invite Link
     
@@ -45,6 +49,16 @@ class PairingViewModel: ObservableObject {
                 await self?.handleShareFailed(error: notification.object as? Error)
             }
         }
+
+        cloudKitService.restorePersistedState()
+        Task { try? await self.cloudKitService.checkPairingStatus() }
+
+        scenePhaseCancellable = NotificationCenter.default.publisher(for: UIScene.didActivateNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { try? await self.cloudKitService.checkPairingStatus() }
+            }
     }
     
     deinit {
@@ -54,6 +68,8 @@ class PairingViewModel: ObservableObject {
         if let observer = shareFailedObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        scenePhaseCancellable?.cancel()
+        pairingWatcherTask?.cancel()
     }
 
     @MainActor
@@ -75,6 +91,7 @@ class PairingViewModel: ObservableObject {
             self.share = result.share
             self.shareURL = result.url
             self.showShareSheet = true
+            startPairingWatcher()
             isCreatingLink = false
         } catch {
             if let nsError = error as NSError?,
@@ -87,6 +104,19 @@ class PairingViewModel: ObservableObject {
                 self.error = "Failed to create invite link: \(error.localizedDescription)"
             }
             isCreatingLink = false
+        }
+    }
+
+    private func startPairingWatcher() {
+        pairingWatcherTask?.cancel()
+        pairingWatcherTask = Task { [weak self] in
+            guard let self else { return }
+            for _ in 0..<40 {
+                if Task.isCancelled { break }
+                try? await self.cloudKitService.checkPairingStatus()
+                if self.cloudKitService.isPaired { break }
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
         }
     }
     
