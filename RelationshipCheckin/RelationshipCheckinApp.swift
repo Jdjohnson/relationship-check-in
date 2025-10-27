@@ -11,8 +11,7 @@ import UserNotifications
 @main
 struct RelationshipCheckinApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @UIApplicationDelegateAdaptor(RCAppDelegate.self) var appDelegate
-    @StateObject private var cloudKitService = CloudKitService.shared
+    @StateObject private var supabaseService = SupabaseService.shared
     @StateObject private var notificationService = NotificationService.shared
     @StateObject private var deepLinkService = DeepLinkService.shared
     
@@ -24,7 +23,7 @@ struct RelationshipCheckinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(cloudKitService)
+                .environmentObject(supabaseService)
                 .environmentObject(notificationService)
                 .environmentObject(deepLinkService)
                 .onOpenURL { url in
@@ -34,13 +33,8 @@ struct RelationshipCheckinApp: App {
                     }
                 }
                 .task {
-                    await cloudKitService.initialize()
                     await notificationService.requestPermission()
                     notificationService.scheduleNotifications()
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .active else { return }
-                    Task { try? await cloudKitService.checkPairingStatus() }
                 }
         }
     }

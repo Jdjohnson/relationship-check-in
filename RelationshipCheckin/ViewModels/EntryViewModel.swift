@@ -6,8 +6,9 @@
 //
 
 import Foundation
-import CloudKit
 import SwiftUI
+import Supabase
+import UIKit
 
 @MainActor
 class EntryViewModel: ObservableObject {
@@ -20,7 +21,7 @@ class EntryViewModel: ObservableObject {
     @Published var error: String?
     @Published var showSuccess = false
     
-    private let cloudKitService = CloudKitService.shared
+    private let supabase = SupabaseService.shared
     let entryType: EntryType
     
     init(entryType: EntryType) {
@@ -33,16 +34,26 @@ class EntryViewModel: ObservableObject {
     // MARK: - Load Today's Entry
     
     func loadTodayEntry() async {
-        guard let userRecordID = cloudKitService.currentUserRecordID else { return }
-        
-        let today = Calendar.current.startOfDay(for: Date())
-        
+        guard let userId = supabase.currentUser?.id, let coupleId = supabase.coupleId else { return }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayString = formatter.string(from: Date())
         do {
-            if let entry = try await cloudKitService.fetchDailyEntry(for: today, userRecordID: userRecordID) {
-                self.morningNeed = entry.morningNeed ?? ""
-                self.eveningMood = entry.eveningMood
-                self.gratitude = entry.gratitude ?? ""
-                self.tomorrowGreat = entry.tomorrowGreat ?? ""
+            let rows: [DailyEntryDB] = try await supabase.client.database
+                .from("daily_entries")
+                .select()
+                .eq("author_user_id", value: userId)
+                .eq("couple_id", value: coupleId)
+                .eq("date", value: todayString)
+                .execute()
+                .value
+            if let row = rows.first {
+                self.morningNeed = row.morningNeed ?? ""
+                self.eveningMood = row.eveningMood.flatMap { Mood(rawValue: $0) }
+                self.gratitude = row.gratitude ?? ""
+                self.tomorrowGreat = row.tomorrowGreat ?? ""
             }
         } catch {
             print("Error loading today's entry: \(error)")
@@ -52,15 +63,7 @@ class EntryViewModel: ObservableObject {
     // MARK: - Save Entry
     
     func saveEntry() async {
-        do {
-            try await cloudKitService.ensurePrivateZone()
-        } catch {
-            self.error = "Unable to initialize CloudKit: \(error.localizedDescription)"
-            return
-        }
-
-        guard let userRecordID = cloudKitService.currentUserRecordID,
-              let coupleRecordID = cloudKitService.coupleRecordID else {
+        guard let userId = supabase.currentUser?.id, let coupleId = supabase.coupleId else {
             self.error = "Not properly initialized"
             return
         }
@@ -68,45 +71,38 @@ class EntryViewModel: ObservableObject {
         isSaving = true
         error = nil
         
-        let today = Calendar.current.startOfDay(for: Date())
-        let recordName = DailyEntry.recordName(for: today, userRecordName: userRecordID.recordName)
-        
-        let userReference = CKRecord.Reference(recordID: userRecordID, action: .none)
-        let coupleReference = CKRecord.Reference(recordID: coupleRecordID, action: .none)
-        
-        var entry = DailyEntry(
-            id: recordName,
-            date: today,
-            authorUserRecordID: userReference,
-            morningNeed: morningNeed.isEmpty ? nil : morningNeed,
-            eveningMood: eveningMood,
-            gratitude: gratitude.isEmpty ? nil : gratitude,
-            tomorrowGreat: tomorrowGreat.isEmpty ? nil : tomorrowGreat,
-            coupleReference: coupleReference
-        )
-        
-        // Load existing entry to merge fields
-        if let existingEntry = try? await cloudKitService.fetchDailyEntry(for: today, userRecordID: userRecordID) {
-            // Merge: keep existing values if current ones are empty
-            if entryType == .evening {
-                entry.morningNeed = existingEntry.morningNeed ?? entry.morningNeed
-            } else {
-                entry.eveningMood = existingEntry.eveningMood ?? entry.eveningMood
-                entry.gratitude = existingEntry.gratitude ?? entry.gratitude
-                entry.tomorrowGreat = existingEntry.tomorrowGreat ?? entry.tomorrowGreat
-            }
-        }
-        
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayString = formatter.string(from: Date())
         do {
-            try await cloudKitService.upsertDailyEntry(entry)
+            struct DailyEntryUpsert: Encodable {
+                let couple_id: UUID
+                let author_user_id: UUID
+                let date: String
+                let morning_need: String?
+                let evening_mood: Int?
+                let gratitude: String?
+                let tomorrow_great: String?
+            }
+            let payload = DailyEntryUpsert(
+                couple_id: coupleId,
+                author_user_id: userId,
+                date: todayString,
+                morning_need: morningNeed.isEmpty ? nil : morningNeed,
+                evening_mood: eveningMood?.rawValue,
+                gratitude: gratitude.isEmpty ? nil : gratitude,
+                tomorrow_great: tomorrowGreat.isEmpty ? nil : tomorrowGreat
+            )
+            _ = try await supabase.client.database
+                .from("daily_entries")
+                .upsert(payload, onConflict: "author_user_id,date")
+                .execute()
             showSuccess = true
             isSaving = false
-            
-            // Haptic feedback
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
-            
-            // Auto-dismiss after a moment
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             showSuccess = false
         } catch {

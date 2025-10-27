@@ -8,14 +8,16 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var cloudKitService: CloudKitService
+    @EnvironmentObject var supabaseService: SupabaseService
     @EnvironmentObject var deepLinkService: DeepLinkService
     
     var body: some View {
         Group {
-            if cloudKitService.isInitializing {
+            if supabaseService.isInitializing {
                 LoadingScreen()
-            } else if !cloudKitService.isPaired {
+            } else if supabaseService.session == nil {
+                LoginView()
+            } else if !supabaseService.isPaired {
                 PairingView()
             } else {
                 MainView()

@@ -6,10 +6,10 @@
 //
 
 import Foundation
-import CloudKit
 import SwiftUI
 import UIKit
 import Combine
+import Supabase
 
 @MainActor
 class PairingViewModel: ObservableObject {
@@ -19,10 +19,8 @@ class PairingViewModel: ObservableObject {
     @Published var error: String?
     @Published var showShareSheet = false
     
-    private let cloudKitService = CloudKitService.shared
-    private let shareService = ShareService.shared
+    private let supabase = SupabaseService.shared
     
-    private var share: CKShare?
     private var shareAcceptedObserver: NSObjectProtocol?
     private var shareFailedObserver: NSObjectProtocol?
     private var scenePhaseCancellable: AnyCancellable?
@@ -31,33 +29,17 @@ class PairingViewModel: ObservableObject {
     // MARK: - Create Invite Link
     
     init() {
-        shareAcceptedObserver = NotificationCenter.default.addObserver(
-            forName: .rcShareAccepted,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            Task { await self.refreshAfterShareAccepted() }
+        NotificationCenter.default.addObserver(forName: Notification.Name("rc.handleInvite"), object: nil, queue: .main) { [weak self] note in
+            guard let url = note.object as? URL else { return }
+            Task { await self?.acceptInviteLink(url: url) }
         }
-
-        shareFailedObserver = NotificationCenter.default.addObserver(
-            forName: .rcShareFailed,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            Task { [weak self] in
-                await self?.handleShareFailed(error: notification.object as? Error)
-            }
-        }
-
-        cloudKitService.restorePersistedState()
-        Task { try? await self.cloudKitService.checkPairingStatus() }
+        Task { await self.supabase.checkPairingStatus() }
 
         scenePhaseCancellable = NotificationCenter.default.publisher(for: UIScene.didActivateNotification)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                Task { try? await self.cloudKitService.checkPairingStatus() }
+                Task { await self.supabase.checkPairingStatus() }
             }
     }
     
@@ -87,22 +69,24 @@ class PairingViewModel: ObservableObject {
         error = nil
         
         do {
-            let result = try await shareService.createShareURLForCouple()
-            self.share = result.share
-            self.shareURL = result.url
+            guard let userId = supabase.currentUser?.id else { throw NSError(domain: "Pairing", code: -1) }
+            let rows: [Couple] = try await supabase.client.database
+                .from("couples")
+                .insert(["owner_user_id": userId.uuidString])
+                .select()
+                .execute()
+                .value
+            guard let couple = rows.first, let code = couple.inviteCode else { throw NSError(domain: "Pairing", code: -2) }
+            var components = URLComponents()
+            components.scheme = "rc"
+            components.host = "invite"
+            components.path = "/\(code.uuidString)"
+            self.shareURL = components.url
             self.showShareSheet = true
             startPairingWatcher()
             isCreatingLink = false
         } catch {
-            if let nsError = error as NSError?,
-               nsError.domain == "ShareService",
-               nsError.code == -2 {
-                self.error = "Only the owner can create invites. Ask your partner to use Accept Invite."
-            } else if let ck = error as? CKError {
-                self.error = "CloudKit: \(ck.code) – \(ck.localizedDescription)"
-            } else {
-                self.error = "Failed to create invite link: \(error.localizedDescription)"
-            }
+            self.error = "Failed to create invite link: \(error.localizedDescription)"
             isCreatingLink = false
         }
     }
@@ -113,32 +97,19 @@ class PairingViewModel: ObservableObject {
             guard let self else { return }
             for _ in 0..<40 {
                 if Task.isCancelled { break }
-                try? await self.cloudKitService.checkPairingStatus()
-                if self.cloudKitService.isPaired { break }
+                await self.supabase.checkPairingStatus()
+                if self.supabase.isPaired { break }
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
     }
     
     @MainActor
-    func refreshAfterShareAccepted() async {
-        do {
-            _ = try await cloudKitService.ensureCouple()
-            self.error = nil
-        } catch {
-            self.error = "Paired, but failed to sync: \(error.localizedDescription)"
-        }
-    }
+    func refreshAfterShareAccepted() async { }
     
     // MARK: - Deep Link Builder
     
-    private func makeAcceptDeepLink(from shareURL: URL) -> URL? {
-        var components = URLComponents()
-        components.scheme = "rc"
-        components.host = "accept"
-        components.queryItems = [URLQueryItem(name: "share", value: shareURL.absoluteString)]
-        return components.url
-    }
+    private func makeAcceptDeepLink(code: String) -> URL? { nil }
     
     // MARK: - Accept Invite Link
     
@@ -147,19 +118,17 @@ class PairingViewModel: ObservableObject {
         error = nil
         
         do {
-            // Support both raw CKShare URLs and rc://accept deep links
-            let targetURL: URL
-            if url.scheme == "rc",
-               let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
-               let shareStr = comps.queryItems?.first(where: { $0.name == "share" })?.value,
-               let shareURL = URL(string: shareStr) {
-                targetURL = shareURL
-            } else {
-                targetURL = url
-            }
-            let metadata = try await shareService.fetchShareMetadata(from: targetURL)
-            try await shareService.acceptShare(metadata: metadata)
-            
+            guard url.scheme == "rc", url.host == "invite" else { throw NSError(domain: "Pairing", code: -3) }
+            let code = url.lastPathComponent
+            guard let userId = supabase.currentUser?.id else { throw NSError(domain: "Pairing", code: -1) }
+            _ = try await supabase.client.database
+                .from("couples")
+                .update(["partner_user_id": userId.uuidString, "invite_code": NSNull()])
+                .eq("invite_code", value: code)
+                .is("partner_user_id", value: nil)
+                .select()
+                .execute()
+            await supabase.checkPairingStatus()
             isAcceptingLink = false
         } catch {
             self.error = "Failed to accept invite: \(error.localizedDescription)"
@@ -169,14 +138,6 @@ class PairingViewModel: ObservableObject {
     
     // MARK: - Complete Pairing
     
-    func completePairing() async {
-        // After partner accepts, stop sharing to lock at two users
-        if let share = share {
-            do {
-                try await shareService.stopSharing(share: share)
-            } catch {
-                print("Error stopping share: \(error)")
-            }
-        }
-    }
+    func completePairing() async { }
 }
+

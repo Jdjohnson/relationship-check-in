@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import CloudKit
 
 enum EntryType: String {
     case morning
@@ -30,18 +29,11 @@ class DeepLinkService: ObservableObject {
     func handle(url: URL) {
         guard url.scheme == "rc" else { return }
         
-        // Handle accept flow: rc://accept?share=<encoded CKShare URL>
-        if url.host == "accept",
-           let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
-           let shareStr = comps.queryItems?.first(where: { $0.name == "share" })?.value,
-           let shareURL = URL(string: shareStr) {
+        // Handle invite accept: rc://invite/<code>
+        if url.host == "invite" {
             Task { @MainActor in
-                do {
-                    let metadata = try await ShareService.shared.fetchShareMetadata(from: shareURL)
-                    try await ShareService.shared.acceptShare(metadata: metadata)
-                } catch {
-                    print("Accept via deeplink failed: \(error)")
-                }
+                // Forward to global handler on the currently presented PairingView if needed
+                NotificationCenter.default.post(name: Notification.Name("rc.handleInvite"), object: url)
             }
             return
         }

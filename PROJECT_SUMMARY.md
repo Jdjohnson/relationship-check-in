@@ -2,7 +2,7 @@
 
 ## Overview
 
-A private iOS app for couples to share daily check-ins, built with SwiftUI, CloudKit, and local notifications.
+A private iOS app for couples to share daily check-ins, built with SwiftUI, Supabase (Auth + Postgres), and local notifications.
 
 ## What's Been Created
 
@@ -18,11 +18,12 @@ All Swift files have been created and are ready to use:
 - `Models/Mood.swift` - Enum for green/yellow/red moods
 - `Models/DailyEntry.swift` - Daily check-in data model with CloudKit conversion
 
-#### Services (4 files)
-- `Services/CloudKitService.swift` - CloudKit operations (CRUD, pairing, queries)
-- `Services/ShareService.swift` - CloudKit sharing for pairing
+#### Services (5 files)
+- `Services/SupabaseService.swift` - Supabase client, session, pairing status
+- `Services/AuthService.swift` - Email/password auth via Supabase
 - `Services/NotificationService.swift` - Local notifications at 8 AM & 5 PM
-- `Services/DeepLinkService.swift` - Deep link routing (rc://entry/morning|evening)
+- `Services/DeepLinkService.swift` - Deep link routing (rc://entry|invite)
+- `Services/ShareService.swift` - (placeholder)
 
 #### ViewModels (4 files)
 - `ViewModels/MainViewModel.swift` - Main screen logic
@@ -63,13 +64,13 @@ All Swift files have been created and are ready to use:
 
 ### Key Technologies
 - **SwiftUI**: Modern declarative UI
-- **CloudKit**: Private database with sharing
+- **Supabase**: Auth (email/password) + Postgres
 - **UserNotifications**: Local daily reminders
 - **Combine**: Reactive state management (@Published)
 
 ### Data Flow
 ```
-User Action → ViewModel → Service → CloudKit
+User Action → ViewModel → Service → Supabase
                 ↓
             @Published
                 ↓
@@ -222,9 +223,9 @@ Relationship Check-in/
 ### Materials
 - Primary: `.ultraThinMaterial` (liquid glass effect)
 
-## CloudKit Schema
+## Supabase Schema
 
-Source of truth: `CloudKit/schema.ckdsl` (mirror these settings in CloudKit Dashboard).
+Source of truth: Supabase dashboard (couples, daily_entries tables with RLS).
 
 ### Couple Record
 - `ownerUserRecordID` (Reference — set to User in Dashboard if desired)
@@ -255,10 +256,7 @@ Source of truth: `CloudKit/schema.ckdsl` (mirror these settings in CloudKit Dash
 
 ## Security & Privacy
 
-- ✅ Private iCloud storage
-- ✅ Sign in with Apple
-- ✅ CloudKit sharing (controlled)
-- ✅ No third-party services
+- ✅ Supabase Auth + RLS enforced per couple
 - ✅ No analytics
 - ✅ Local notifications only
 - ✅ Two-user limit
