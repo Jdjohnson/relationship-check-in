@@ -52,10 +52,16 @@ class EntryViewModel: ObservableObject {
     // MARK: - Save Entry
     
     func saveEntry() async {
+        do {
+            try await cloudKitService.ensurePrivateZone()
+        } catch {
+            self.error = "Unable to initialize CloudKit: \(error.localizedDescription)"
+            return
+        }
+
         guard let userRecordID = cloudKitService.currentUserRecordID,
-              let coupleRecordID = cloudKitService.coupleRecordID,
-              cloudKitService.customZoneID != nil else {
-            error = "Not properly initialized"
+              let coupleRecordID = cloudKitService.coupleRecordID else {
+            self.error = "Not properly initialized"
             return
         }
         
@@ -120,4 +126,3 @@ class EntryViewModel: ObservableObject {
         }
     }
 }
-

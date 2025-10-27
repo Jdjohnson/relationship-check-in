@@ -18,11 +18,25 @@ class ShareService: ObservableObject {
     @Published var error: Error?
     
     private let cloudKitService = CloudKitService.shared
+    private let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
     
     private init() {}
     
     // MARK: - Create Share
-    
+
+    func createShareURLForCouple() async throws -> (share: CKShare, url: URL) {
+        let coupleRecord = try await cloudKitService.ensureCouple()
+        let share = try await createShare(for: coupleRecord)
+        guard let url = share.url else {
+            throw NSError(
+                domain: "ShareService",
+                code: -3,
+                userInfo: [NSLocalizedDescriptionKey: "Share URL unavailable"]
+            )
+        }
+        return (share, url)
+    }
+
     private func fetchExistingShare(for rootID: CKRecord.ID, in db: CKDatabase) async throws -> CKShare? {
         let predicate = NSPredicate(format: "rootRecord == %@", rootID)
         let query = CKQuery(recordType: "cloudkit.share", predicate: predicate)
@@ -44,7 +58,6 @@ class ShareService: ObservableObject {
     }
     
     func createShare(for coupleRecord: CKRecord) async throws -> CKShare {
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
         let db = container.privateCloudDatabase
         
         let root: CKRecord
@@ -96,21 +109,24 @@ class ShareService: ObservableObject {
             throw ck
         }
     }
-    
+
     func getShareURL(for share: CKShare) -> URL? {
         return share.url
     }
-    
+
     // MARK: - Accept Share
-    
+
     func acceptShare(metadata: CKShare.Metadata) async throws {
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
-        
         do {
             _ = try await container.accept(metadata)
 
             let userRecordID = try await container.userRecordID()
             cloudKitService.currentUserRecordID = userRecordID
+
+            if cloudKitService.coupleRecordID == nil,
+               let rootRecordID = extractRootRecordID(from: metadata) {
+                cloudKitService.coupleRecordID = rootRecordID
+            }
 
             await cloudKitService.checkPairingStatus()
             try await cloudKitService.updateCoupleWithPartner(partnerRecordID: userRecordID)
@@ -139,17 +155,33 @@ class ShareService: ObservableObject {
     // MARK: - Stop Sharing (Lock to two users)
     
     func stopSharing(share: CKShare) async throws {
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
         let privateDB = container.privateCloudDatabase
         
         // Delete the share to prevent more people from joining
         try await privateDB.deleteRecord(withID: share.recordID)
     }
-    
+
     // MARK: - Fetch Share Metadata
+
+    func metadata(for url: URL) async throws -> CKShare.Metadata {
+        return try await container.shareMetadata(for: url)
+    }
     
     func fetchShareMetadata(from url: URL) async throws -> CKShare.Metadata {
-        let container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
-        return try await container.shareMetadata(for: url)
+        return try await metadata(for: url)
+    }
+
+    private func extractRootRecordID(from metadata: CKShare.Metadata) -> CKRecord.ID? {
+        if #available(iOS 16.0, *), let root = metadata.rootRecord {
+            return root.recordID
+        }
+
+        let selector = NSSelectorFromString("rootRecordID")
+        guard metadata.responds(to: selector),
+              let unmanaged = metadata.perform(selector),
+              let recordID = unmanaged.takeUnretainedValue() as? CKRecord.ID else {
+            return nil
+        }
+        return recordID
     }
 }

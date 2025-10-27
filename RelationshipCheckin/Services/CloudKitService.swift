@@ -16,7 +16,8 @@ class CloudKitService: ObservableObject {
     private let container: CKContainer
     private let privateDatabase: CKDatabase
     private let sharedDatabase: CKDatabase
-    
+    private let zoneID: CKRecordZone.ID
+
     @Published var isInitializing = true
     @Published var isPaired = false
     @Published var currentUserRecordID: CKRecord.ID?
@@ -24,34 +25,22 @@ class CloudKitService: ObservableObject {
     @Published var partnerUserRecordID: CKRecord.ID?
     @Published var error: Error?
     
-    private let customZoneName = "RelationshipZone"
-    var customZoneID: CKRecordZone.ID?
-    
     private init() {
         self.container = CKContainer(identifier: "iCloud.com.jaradjohnson.RelationshipCheckin")
         self.privateDatabase = container.privateCloudDatabase
         self.sharedDatabase = container.sharedCloudDatabase
+        self.zoneID = CKRecordZone.ID(zoneName: "RelationshipZone", ownerName: CKCurrentUserDefaultName)
     }
     
     // MARK: - Initialization
-    
+
     func initialize() async {
         do {
             // Fetch current user
             let userRecordID = try await container.userRecordID()
             self.currentUserRecordID = userRecordID
             
-            // Create or fetch custom zone
-            let zoneID = CKRecordZone.ID(zoneName: customZoneName, ownerName: CKCurrentUserDefaultName)
-            self.customZoneID = zoneID
-            
-            do {
-                _ = try await privateDatabase.recordZone(for: zoneID)
-            } catch {
-                // Zone doesn't exist, create it
-                let zone = CKRecordZone(zoneID: zoneID)
-                _ = try await privateDatabase.save(zone)
-            }
+            try await ensurePrivateZone()
             
             // Check if already paired
             await checkPairingStatus()
@@ -64,68 +53,104 @@ class CloudKitService: ObservableObject {
         }
     }
     
+    // MARK: - Zones
+    
+    func ensurePrivateZone() async throws {
+        do {
+            _ = try await privateDatabase.recordZone(for: zoneID)
+        } catch let ck as CKError {
+            if ck.code == .unknownItem {
+                let zone = CKRecordZone(zoneID: zoneID)
+                _ = try await privateDatabase.save(zone)
+            } else {
+                throw ck
+            }
+        }
+    }
+
+    private func findCoupleRecord(for userRecordID: CKRecord.ID) async throws -> CKRecord? {
+        let predicate = NSPredicate(format: "ownerUserRecordID == %@ OR partnerUserRecordID == %@", userRecordID, userRecordID)
+        let query = CKQuery(recordType: "Couple", predicate: predicate)
+
+        let (privateMatches, _) = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
+        for (_, result) in privateMatches {
+            if let record = try? result.get() {
+                return record
+            }
+        }
+
+        let (sharedMatches, _) = try await sharedDatabase.records(matching: query)
+        for (_, result) in sharedMatches {
+            if let record = try? result.get() {
+                return record
+            }
+        }
+
+        return nil
+    }
+    
+    private func applyCoupleState(from record: CKRecord) {
+        self.coupleRecordID = record.recordID
+        if let partnerRef = record["partnerUserRecordID"] as? CKRecord.Reference {
+            self.partnerUserRecordID = partnerRef.recordID
+            self.isPaired = true
+        } else {
+            self.partnerUserRecordID = nil
+            self.isPaired = false
+        }
+    }
+    
+    private func currentUserRecord() async throws -> CKRecord.ID {
+        if let id = currentUserRecordID {
+            return id
+        }
+        let id = try await container.userRecordID()
+        currentUserRecordID = id
+        return id
+    }
+    
     // MARK: - Pairing
     
     func checkPairingStatus() async {
         do {
-            // Try to find Couple record in private DB
-            let query = CKQuery(recordType: "Couple", predicate: NSPredicate(value: true))
-            let (matchResults, _) = try await privateDatabase.records(matching: query, inZoneWith: customZoneID)
-            
-            if let firstMatch = matchResults.first {
-                let coupleRecord = try firstMatch.1.get()
-                self.coupleRecordID = coupleRecord.recordID
-                
-                if let partnerRef = coupleRecord["partnerUserRecordID"] as? CKRecord.Reference {
-                    self.partnerUserRecordID = partnerRef.recordID
-                    self.isPaired = true
-                } else {
-                    self.isPaired = false
+            try await ensurePrivateZone()
+            let userRecordID = try await currentUserRecord()
+            if let coupleID = coupleRecordID {
+                for database in [privateDatabase, sharedDatabase] {
+                    if let record = try? await database.record(for: coupleID) {
+                        applyCoupleState(from: record)
+                        return
+                    }
                 }
-                return
             }
-            
-            // Try shared database
-            let sharedQuery = CKQuery(recordType: "Couple", predicate: NSPredicate(value: true))
-            let (sharedResults, _) = try await sharedDatabase.records(matching: sharedQuery)
-            
-            if let firstShared = sharedResults.first {
-                let coupleRecord = try firstShared.1.get()
-                self.coupleRecordID = coupleRecord.recordID
-                
-                if let partnerRef = coupleRecord["partnerUserRecordID"] as? CKRecord.Reference {
-                    self.partnerUserRecordID = partnerRef.recordID
-                    self.isPaired = true
-                } else {
-                    self.isPaired = false
-                }
+
+            if let record = try await findCoupleRecord(for: userRecordID) {
+                applyCoupleState(from: record)
             } else {
+                self.partnerUserRecordID = nil
                 self.isPaired = false
             }
         } catch {
             print("Error checking pairing status: \(error)")
+            self.partnerUserRecordID = nil
             self.isPaired = false
         }
     }
     
     func createCouple() async throws -> CKRecord {
-        guard let zoneID = customZoneID, let userRecordID = currentUserRecordID else {
-            throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not initialized"])
-        }
+        let userRecordID = try await currentUserRecord()
 
         let recordID = CKRecord.ID(recordName: "Couple_\(UUID().uuidString)", zoneID: zoneID)
         let coupleRecord = CKRecord(recordType: "Couple", recordID: recordID)
-
-        let userReference = CKRecord.Reference(recordID: userRecordID, action: .none)
-        coupleRecord["ownerUserRecordID"] = userReference
+        coupleRecord["ownerUserRecordID"] = CKRecord.Reference(recordID: userRecordID, action: .none)
 
         let savedRecord = try await privateDatabase.save(coupleRecord)
-        self.coupleRecordID = savedRecord.recordID
-
+        applyCoupleState(from: savedRecord)
         return savedRecord
     }
 
     func ensureCouple() async throws -> CKRecord {
+        try await ensurePrivateZone()
         if let coupleRecordID = coupleRecordID {
             // Prefer the owner's private DB record to create/modify shares.
             for database in [privateDatabase, sharedDatabase] {
@@ -155,36 +180,26 @@ class CloudKitService: ObservableObject {
             throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "No couple record"])
         }
         
-        // Fetch from appropriate database
-        let databases = [sharedDatabase, privateDatabase]
-        var coupleRecord: CKRecord?
-        
-        for db in databases {
+        let partnerReference = CKRecord.Reference(recordID: partnerRecordID, action: .none)
+        for db in [privateDatabase, sharedDatabase] {
             do {
-                coupleRecord = try await db.record(for: coupleRecordID)
-                if coupleRecord != nil {
-                    let partnerReference = CKRecord.Reference(recordID: partnerRecordID, action: .none)
-                    coupleRecord!["partnerUserRecordID"] = partnerReference
-                    _ = try await db.save(coupleRecord!)
-                    
-                    self.partnerUserRecordID = partnerRecordID
-                    self.isPaired = true
-                    return
-                }
+                let record = try await db.record(for: coupleRecordID)
+                record["partnerUserRecordID"] = partnerReference
+                let saved = try await db.save(record)
+                applyCoupleState(from: saved)
+                return
             } catch {
                 continue
             }
         }
-        
+
         throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not find couple record"])
     }
     
     // MARK: - Daily Entries
     
     func upsertDailyEntry(_ entry: DailyEntry) async throws {
-        guard let zoneID = customZoneID else {
-            throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Zone not initialized"])
-        }
+        try await ensurePrivateZone()
         
         let record = entry.toCKRecord(in: zoneID)
         
@@ -198,10 +213,7 @@ class CloudKitService: ObservableObject {
     
     func fetchDailyEntry(for date: Date, userRecordID: CKRecord.ID) async throws -> DailyEntry? {
         let recordName = DailyEntry.recordName(for: date, userRecordName: userRecordID.recordName)
-        
-        guard let zoneID = customZoneID else {
-            throw NSError(domain: "CloudKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Zone not initialized"])
-        }
+        try await ensurePrivateZone()
         
         let recordID = CKRecord.ID(recordName: recordName, zoneID: zoneID)
         
@@ -244,7 +256,7 @@ class CloudKitService: ObservableObject {
         
         // Query private database
         do {
-            let (results, _) = try await privateDatabase.records(matching: query, inZoneWith: customZoneID)
+            let (results, _) = try await privateDatabase.records(matching: query, inZoneWith: zoneID)
             for result in results {
                 if let record = try? result.1.get(), let entry = DailyEntry.from(record: record) {
                     entries.append(entry)

@@ -20,9 +20,9 @@ class PairingViewModel: ObservableObject {
     private let cloudKitService = CloudKitService.shared
     private let shareService = ShareService.shared
     
-    private var coupleRecord: CKRecord?
     private var share: CKShare?
     private var shareAcceptedObserver: NSObjectProtocol?
+    private var shareFailedObserver: NSObjectProtocol?
     
     // MARK: - Create Invite Link
     
@@ -35,11 +35,34 @@ class PairingViewModel: ObservableObject {
             guard let self else { return }
             Task { await self.refreshAfterShareAccepted() }
         }
+
+        shareFailedObserver = NotificationCenter.default.addObserver(
+            forName: .rcShareFailed,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            Task { [weak self] in
+                await self?.handleShareFailed(error: notification.object as? Error)
+            }
+        }
     }
     
     deinit {
         if let observer = shareAcceptedObserver {
             NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = shareFailedObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    @MainActor
+    private func handleShareFailed(error: Error?) {
+        isAcceptingLink = false
+        if let error {
+            self.error = "Failed to accept invite: \(error.localizedDescription)"
+        } else {
+            self.error = "Failed to accept invite. Please try again."
         }
     }
 
@@ -48,20 +71,10 @@ class PairingViewModel: ObservableObject {
         error = nil
         
         do {
-            // Fetch or create couple record
-            let couple = try await cloudKitService.ensureCouple()
-            self.coupleRecord = couple
-            
-            // Create share
-            let share = try await shareService.createShare(for: couple)
-            self.share = share
-            
-            // Get iCloud share URL for system share sheet
-            if let url = shareService.getShareURL(for: share) {
-                self.shareURL = url
-                self.showShareSheet = true
-            }
-            
+            let result = try await shareService.createShareURLForCouple()
+            self.share = result.share
+            self.shareURL = result.url
+            self.showShareSheet = true
             isCreatingLink = false
         } catch {
             if let nsError = error as NSError?,
